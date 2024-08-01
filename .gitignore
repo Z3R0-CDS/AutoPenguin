@@ -1,5 +1,3 @@
-./dist
-./.venv
-./build
+
 *.spec
 *.json
