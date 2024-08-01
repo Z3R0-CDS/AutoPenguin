@@ -23,7 +23,9 @@
 
 ## Usage
 
-    soon
+    Will be finished soon!
+
+    1. Start the cli interface. Type "AutoPenguin"
 
 ## Features
 - Auto save to config
@@ -39,6 +41,8 @@
 
 Installer
 - Shell script
+  - Curl
+  - Requires sudo to get write rights for /usr/bin/
 
 AutoPenguin
 - Python 3.12 +/-
