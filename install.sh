@@ -4,15 +4,13 @@
 # Copyright (c) by Z3R0-CDS and Zer0-Industries.com
 # All rights reserved.
 #
-# This script is used to install the application by downloading the appropriate
-# executable from GitHub based on the system architecture.
 # This script is created by Z3R0-CDS and will be distributed by Z3R0-CDS
-# via Github and or Zer0-Industries.com Modifying the code to use it for
+# via Github and/or Zer0-Industries.com. Modifying the code to use it for
 # profit is forbidden and will be punished.
 ###############################################################################
 
-# Global variables for base URL and app name
-BASE_URL="https://github.com/Z3R0-CDS/AutoPenguin/releases/latest/download"
+# Global variables for repository and app name
+REPO="Z3R0-CDS/AutoPenguin"
 APP_NAME="AutoPenguin"
 
 # Function to check the architecture
@@ -27,35 +25,41 @@ check_architecture() {
   fi
 }
 
-# Function to check the distribution
-check_distro() {
-  if [ -f /etc/os-release ]; then
-    . /etc/os-release
-    DISTRO=$ID
-  else
-    DISTRO=$(uname -s)
+# Function to get the latest release tag from GitHub
+get_latest_release() {
+  LATEST_RELEASE=$(curl --silent "https://api.github.com/repos/$REPO/releases/latest")
+
+  # Extract the tag_name using grep, sed, and awk
+  TAG=$(echo "$LATEST_RELEASE" | grep '"tag_name":' | sed -E 's/.*"tag_name":\s*"([^"]+)".*/\1/')
+
+  if [ -z "$TAG" ]; then
+    echo "Failed to fetch the latest release tag. Response from GitHub API:"
+    echo "$LATEST_RELEASE"
+    exit 1
   fi
-  echo "$DISTRO"
+
+  echo "$TAG"
 }
 
 # Function to download and install the executable
 install_executable() {
   ARCH=$1
-  DISTRO=$2
+  TAG=$2
   URL=""
 
-  # Determine the URL based on architecture
+  # Determine the URL based on architecture and tag
   if [[ "$ARCH" == "x86_64" ]]; then
-    URL="$BASE_URL/${APP_NAME}-x86_64"
-#  elif [[ "$ARCH" == "arm" ]]; then
-#    URL="$BASE_URL/${APP_NAME}-arm"
+    URL="https://github.com/$REPO/releases/download/$TAG/${APP_NAME}-x86_64"
+  elif [[ "$ARCH" == "arm" ]]; then
+    URL="https://github.com/$REPO/releases/download/$TAG/${APP_NAME}-arm"
   else
     echo "Unsupported architecture: $ARCH"
     exit 1
   fi
 
   echo "Downloading from $URL..."
-  wget -O "/usr/bin/$APP_NAME" "$URL"
+  #wget -O "/usr/bin/$APP_NAME" "$URL"
+  curl -sL "$URL" -o "/usr/bin/$APP_NAME"
 
   if [ $? -ne 0 ]; then
     echo "Failed to download the executable."
@@ -63,16 +67,16 @@ install_executable() {
   fi
 
   # Make the file executable
-#  chmod +x "/usr/bin/$APP_NAME"
+  chmod +x "/usr/bin/$APP_NAME"
 
   echo "Installation complete. You can now run '$APP_NAME' from the command line."
 }
 
 # Main script execution
 ARCH=$(check_architecture)
-DISTRO=$(check_distro)
+TAG=$(get_latest_release)
 
 echo "Detected architecture: $ARCH"
-echo "Detected distribution: $DISTRO"
+echo "Latest release tag: $TAG"
 
-install_executable "$ARCH" "$DISTRO"
+install_executable "$ARCH" "$TAG"
