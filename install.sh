@@ -12,6 +12,7 @@
 # Global variables for repository and app name
 REPO="Z3R0-CDS/AutoPenguin"
 APP_NAME="AutoPenguin"
+INSTALL_DIR="/usr/bin"
 
 # Function to check the architecture
 check_architecture() {
@@ -59,7 +60,7 @@ install_executable() {
 
   echo "Downloading from $URL..."
   #wget -O "/usr/bin/$APP_NAME" "$URL"
-  curl -sL "$URL" -o "/usr/bin/$APP_NAME"
+  curl -sL "$URL" -o "$INSTALL_DIR/$APP_NAME"
 
   if [ $? -ne 0 ]; then
     echo "Failed to download the executable."

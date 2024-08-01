@@ -12,6 +12,8 @@ import json
 import os
 import sys
 import time
+import requests
+from packaging.version import Version
 
 from colorama import init, Fore, Back
 import getpass
@@ -30,6 +32,7 @@ class Cli():
         self.softname = appname
         self.__version__ = "0.1"
         self.dev_ver = "0.1.0"
+        self.project = "Z3R0-CDS/AutoPenguin"
         self.privacyMode = False
         self.simpleMode = False
 
@@ -46,6 +49,7 @@ class Cli():
 
         self.commands = [
             {'name': 'help', "alias": ["h"], 'params': '(command)', 'func': self.help, "description": "Help"},
+            {'name': 'update', "alias": ["up"], 'params': 'None', 'func': self.getUpdate, "description": "Checks for an update"},
             {'name': 'privacy', "alias": ['pm'], 'params': 'None', 'func': self.privacy, "description": "Toggle privacy mode to hide name and path"},
             {'name': 'simple', "alias": ['sm'], 'params': 'None', 'func': self.setSimpleMode,
              "description": "Toggle simple mode to shorten path"},
@@ -58,6 +62,7 @@ class Cli():
             ]
 
         self.output(f"---\nWelcome to {self.softname} {self.dev_ver} ~ {len(self.commands)} commands at your fingertip\n---", True)
+        self.getUpdate()
 
     def _setConsoleTItle(self, title):
         if sys.platform == "win64":
@@ -175,8 +180,43 @@ class Cli():
             # No config console hasn't ran yet
             pass
 
+    def getLatest(self):
+        latest = {
+            "success": False
+        }
+        try:
+            rsp = requests.get(f"https://api.github.com/repos/{self.project}/releases/latest", timeout=5)
+            if rsp.ok:
+                data = rsp.json()
+                latest["success"] = True
+                latest["version"] = data["tag_name"]
+                latest["downloads"] = [{"name": asset["name"], "url": asset["browser_download_url"]} for asset in data["assets"]]
+            else:
+                if rsp.status_code == 404:
+                    latest["exception"] = "No Release found / No Release available"
+                else:
+                    latest["exception"] = rsp
+        except Exception as e:
+            latest["exception"] = e
+
+        return latest
 
     # Internal commands
+
+    def getUpdate(self, args=None):
+        self.output("Checking for updates...", True)
+        latest = self.getLatest()
+        if latest["success"]:
+            self.output(f"Fetched latest release: {latest['version']}", True)
+            onlineVersion = Version(latest['version'])
+            selfVersion = Version(self.__version__)
+            if onlineVersion > selfVersion:
+                self.output(f"Update is available. You have ({self.__version__}) but could have ({latest['version']})", True)
+                self.output("Run the install.sh as sudo to update.")
+            else:
+                self.output("No new version :)", True)
+        else:
+            self.output(f"Failed to get latest release: {latest['exception']}", True)
 
     def privacy(self, args):
         if self.simpleMode and not self.privacyMode:

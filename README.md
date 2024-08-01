@@ -20,6 +20,12 @@
     chmod +x install.sh
     sudo ./install.sh
 
+    or 
+  
+    wget -O install.sh https://raw.githubusercontent.com/Z3R0-CDS/AutoPenguin/main/install.sh
+    chmod +x install.sh
+    *edit the install.sh INSTALL_DIR to some other pass that isn't roots*
+    ./install.sh
 
 ## Usage
 
@@ -53,6 +59,8 @@ AutoPenguin
   - json
   - colorama
   - readline
+  - requests
+  - packaging
 
 ## Limitations and Copyright
 
