@@ -33,6 +33,8 @@ class Cli():
         self.__version__ = "0.1"
         self.dev_ver = "0.1.0"
         self.project = "Z3R0-CDS/AutoPenguin"
+        # self.scripts = "Z3R0-CDS/AutoPenguin-Scripts"
+        self.scripts = "Z3R0-CDS/AutoPenguin-Scripts"
         self.privacyMode = False
         self.simpleMode = False
 
@@ -45,14 +47,21 @@ class Cli():
         self.username = getpass.getuser()
         self.privateShellname = f"[Privateshell]:"
 
+        self.requestWithToken = False
+        self.token = None
+
         self.loadConfig()
 
         self.commands = [
             {'name': 'help', "alias": ["h"], 'params': '(command)', 'func': self.help, "description": "Help"},
             {'name': 'update', "alias": ["up"], 'params': 'None', 'func': self.getUpdate, "description": "Checks for an update"},
+            {'name': 'getscripts', "alias": ["gs"], 'params': 'None', 'func': self.installScripts,
+             "description": "Download official scripts"},
             {'name': 'privacy', "alias": ['pm'], 'params': 'None', 'func': self.privacy, "description": "Toggle privacy mode to hide name and path"},
             {'name': 'simple', "alias": ['sm'], 'params': 'None', 'func': self.setSimpleMode,
              "description": "Toggle simple mode to shorten path"},
+            {'name': 'tokenmode', "alias": ['tm'], 'params': 'None', 'func': self.setTokenMode,
+             "description": "Toggle token mode to avoid github ratelimit"},
             {'name': 'exit', "alias": ["ex"], 'params': 'None', 'func': self.quit, "description": f"Exit {self.softname}"},
             {'name': 'about', "alias": ["ab"], 'params': 'None', 'func': self.info, "description": f"Info for {self.softname}"},
             {'name': 'cls', "alias": ["clear", "clr"], 'params': 'None', 'func': self.clear, "description": "Clear Terminal"},
@@ -165,7 +174,9 @@ class Cli():
     def saveConfig(self):
         config = {
             "private": self.privacyMode,
-            "simple": self.simpleMode
+            "simple": self.simpleMode,
+            "tokenmode": self.requestWithToken,
+            "githubtoken": self.token
         }
         with open("config.json", "w") as configFile:
             json.dump(config, configFile, indent=4)
@@ -176,16 +187,19 @@ class Cli():
                 config = json.load(configFile)
                 self.privacyMode = config["private"]
                 self.simpleMode = config["simple"]
+                self.requestWithToken = config["tokenmode"]
+                self.token = config["githubtoken"]
         except:
             # No config console hasn't ran yet
             pass
+        self.headers = {'Authorization': f'Bearer {self.token}'}
 
     def getLatest(self):
         latest = {
             "success": False
         }
         try:
-            rsp = requests.get(f"https://api.github.com/repos/{self.project}/releases/latest", timeout=5)
+            rsp = self.githubapirequest(f"https://api.github.com/repos/{self.project}/releases/latest")
             if rsp.ok:
                 data = rsp.json()
                 latest["success"] = True
@@ -227,6 +241,11 @@ class Cli():
         if self.privacyMode and not self.simpleMode:
             self.privacyMode = False
         self.simpleMode = not self.simpleMode
+
+    def setTokenMode(self, args):
+        self.requestWithToken = not self.requestWithToken
+        if self.requestWithToken and not self.token:
+            self.token = getpass.getpass("Enter your token (will be saved in clean text to config): ")
 
     def quit(self, args):
         self.output('Logging off! Bye...')
@@ -313,3 +332,121 @@ Int Ver: {self.dev_ver}
             os.system(command)
         except Exception as x:
             self.output(f"Error on [system] -> {x}")
+
+    def githubapirequest(self, url, timeout=5, method = requests.get):
+        if self.requestWithToken:
+            return method(url, timeout=timeout, headers=self.headers)
+        else:
+            return method(url, timeout=5)
+
+    # AutoPenguin
+
+    def getBranches(self):
+        branches = False, []
+        try:
+            rsp = self.githubapirequest(f"https://api.github.com/repos/{self.scripts}/branches")
+            if rsp.status_code == 200:
+                return True, [branch['name'] for branch in rsp.json()]
+            else:
+                print(f'Failed to fetch the branches of the repository: API returned {rsp.status_code}')
+                return False, []
+        except Exception as x:
+            branches = False, []
+        return branches
+
+    def getContents(self, url):
+        try:
+            rsp = self.githubapirequest(url)
+            if rsp.ok:
+               return rsp.json()
+            else:
+                self.output(f"Error on requesting repo content -> API returned {rsp.status_code}", True)
+                return []
+        except Exception as x:
+            self.output(f"Error on requesting  repo content -> {x}")
+            return []
+
+    def getScripts(self, branch):
+        scripts = {
+            "success": False,
+            "scripts": {}
+        }
+        scriptcount = 0
+        try:
+            data = self.getContents( f'https://api.github.com/repos/{self.scripts}/contents/?ref={branch}')
+
+            for item in data:
+                # if item['type'] == 'file' and item['name'].endswith('.aps'):
+                #     scripts["scripts"].append({'link': item['download_url'], 'name': item['name']})
+                if item['type'] == 'dir':
+                    # Recursively fetch contents of the subdirectory
+                    self.output(f"Found category {item['name']}", True)
+                    subdir_contents = self.getContents(item['url'])# + f'?ref={branch}' <- not needed if first request is with ref already
+                    scripts["scripts"][item["name"]] = [{'link': file['download_url'], 'name': file['name']} for file in subdir_contents if file['name'].endswith('.aps')]
+                    scriptcount += len(scripts["scripts"][item["name"]])
+                    self.output(f"Found [{len(scripts['scripts'][item['name']])}] script/s in category {item['name']}", True)
+            scripts["success"] = True
+        except Exception as e:
+            scripts["exception"] = e
+            scripts["success"] = False
+        if scriptcount == 0:
+            scripts["success"] = False
+            scripts["exception"] = "No script/s found!"
+        scripts["scriptsize"] = scriptcount
+        return scripts
+
+    def installScripts(self, args):
+        branchesReceived, branches = self.getBranches()
+        if branchesReceived and len(branches)>1:
+            self.output('Available branches:', True)
+            for i, branch in enumerate(branches):
+                self.output(f"{i + 1}: {branch['name']}", True)
+            while True:
+                try:
+                    branch_num = int(input('Enter the number of the branch you want to select: ')) - 1
+                    if branch_num < 0 or branch_num >= len(branches):
+                        self.output('Invalid selection.', True)
+                    else:
+                        selected_branch = branches[branch_num]
+                        break
+
+                except ValueError:
+                    self.output('Please enter a valid number.', True)
+        elif branchesReceived:
+            selected_branch = branches[0]
+        if branchesReceived:
+            self.output(f"Fetching script/s from ({selected_branch})", True)
+            scripts = self.getScripts(selected_branch)
+            if scripts["success"]:
+                self.output(f"Successfully fetched ({scripts['scriptsize']}) script/s.", True)
+                index = 0
+                self.output(f"------------------------------------", True)
+                self.output(f"Available scripts for download", True)
+                self.output(f"------------------------------------", True)
+                self.output(f"[0] Abort", True)
+                for category, categoryScripts in scripts["scripts"].items():
+                    index += 1
+                    self.output(f"[{index}] {category}: {len(categoryScripts)}", True)
+                self.output(f"[{index+1}] Download all", True)
+                self.output(f"------------------------------------", True)
+                while True:
+                    try:
+                        selection = int(input(self.getShellName()))
+                        if selection > len(scripts["scripts"].items())+1 or selection < 0:
+                            self.output('Invalid selection.', True)
+                        if selection == 0:
+                            self.output("Aborting", True)
+                            break
+                        else:
+                            if selection > len(scripts["scripts"].items()):
+                                self.output('Download all.', True)
+                            else:
+                                self.output(f'Download {[category for category, _ in scripts["scripts"].items()][selection-1]}.', True)
+                                selectedCategory = [category for category, _ in scripts["scripts"].items()][selection-1]
+                            break
+                    except ValueError:
+                        self.output(f"Please enter a valid number.", True)
+            else:
+                self.output(f"Failed to fetch scripts -> {scripts['exception']}", True)
+
+
