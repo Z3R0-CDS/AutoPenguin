@@ -27,6 +27,11 @@
     *edit the install.sh INSTALL_DIR to some other pass that isn't roots*
     ./install.sh
 
+    or 
+    
+    use source or even build the application from source using executable.sh
+    this will require pip, pyinstaller and a venv is recommended!
+
 ## Usage
 
     Will be finished soon!
