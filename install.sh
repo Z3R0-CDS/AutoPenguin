@@ -12,7 +12,7 @@
 ###############################################################################
 
 # Global variables for base URL and app name
-BASE_URL="https://github.com/user/repo/releases/latest/download"
+BASE_URL="https://github.com/Z3R0-CDS/AutoPenguin/releases/latest/download"
 APP_NAME="AutoPenguin"
 
 # Function to check the architecture
